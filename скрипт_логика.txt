@@ -1,0 +1,271 @@
+const SHEET_ID  = '1QlHT387Sg6gta76hYwyIVm36C10WWPVKEiUvQBVXh3Q';
+const SHEET_NAME = 'тест';
+
+function doPost(e) {
+  var body = e && e.postData && e.postData.contents ? e.postData.contents : '';
+  if (!body) {
+    return ContentService.createTextOutput('NO_BODY').setMimeType(ContentService.MimeType.TEXT);
+  }
+
+  var strPar = extractStrPar(body);
+  var caseName = e.parameter.case_name || autoDetectCase(strPar) || '';
+
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  var actionName = 'str_par';
+
+  // ПАРСИНГ ПОЛЕЙ
+  var id_order            = extractValueOrNA(strPar, '{[id_order]}{[');
+  var category_id         = extractValueOrNA(strPar, '{[category_id]}{[');
+  var button_name         = extractValueOrNA(strPar, '{[button_name]}{[');
+  var id_screen           = extractValueOrNA(strPar, '{[id_screen]}{[');
+  var id_element          = extractValueOrNA(strPar, '{[id_element]}{[');
+  var actionField         = extractValueOrNA(strPar, '{[action]}{[');
+  var formname            = extractValueOrNA(strPar, '{[formname]}{[');
+  var search_bar          = extractValueOrNA(strPar, '{[search_bar]}{[');
+  var search_bar_fixed    = extractValueOrNA(strPar, '{[search_bar_fixed]}{[');
+  var tovs_subscribe      = extractValueOrNA(strPar, '{[tovs_subscribe_shown]}{[');
+  var rn_tov              = extractValueOrNA(strPar, '{[rn_tov]}{[');
+  var tovs_rn_shown_sort  = extractValueOrNA(strPar, '{[tovs_rn_shown_sort]}{[');
+  var tovs_rn_disc_sort   = extractValueOrNA(strPar, '{[tovs_rn_shown_discount_sort]}{[');
+  var falseteasers_sh     = extractValueOrNA(strPar, '{[falseteasers_shown]}{[');
+  var id_tov              = extractValueOrNA(strPar, '{[id_tov]}{[');
+  var tov_reason_real     = extractValueOrNA(strPar, '{[tov_reason_array_real]}{[');
+  var tovs_rn_na_sort     = extractValueOrNA(strPar, '{[tovs_rn_na_sort]}{[');
+  var tovs_rn_real_sort   = extractValueOrNA(strPar, '{[tovs_rn_real_sort]}{[');
+  var rn_green            = extractValueOrNA(strPar, '{[rn_green]}{[');
+  var rn_max              = extractValueOrNA(strPar, '{[rn_max]}{[');
+  var tovs_rn_archive     = extractValueOrNA(strPar, '{[tovs_rn_archive]}{[');
+  var name_tov            = extractValueOrNA(strPar, '{[name_tov]}{[');
+  var tovs_rn_arch_sort   = extractValueOrNA(strPar, '{[tovs_rn_archive_sort]}{[');
+  var widget_id           = extractValueOrNA(strPar, '{[widget_id]}{[');
+  var widget_type         = extractValueOrNA(strPar, '{[widget_type]}{[');
+  var widget_title        = extractValueOrNA(strPar, '{[widget_title]}{[');
+  var group_list          = extractValueOrNA(strPar, '{[group_list]}{[');
+  var boost_array         = extractValueOrNA(strPar, '{[boost_array]}{[');
+  var id_tov_boost_arr    = extractValueOrNA(strPar, '{[id_tov_boost_array]}{[');
+  var position_boost_arr  = extractValueOrNA(strPar, '{[position_boost_array]}{[');
+  var id_split_array      = extractValueOrNA(strPar, '{[id_split_array]}{[');
+  var boost_na_array      = extractValueOrNA(strPar, '{[boost_na_array]}{[');
+  var id_tov_boost_na     = extractValueOrNA(strPar, '{[id_tov_boost_na_array]}{[');
+  var position_boost_na   = extractValueOrNA(strPar, '{[position_boost_na_array]}{[');
+  var id_cohort           = extractValueOrNA(strPar, '{[id_cohort]}{[');
+  var id_split_na_array   = extractValueOrNA(strPar, '{[id_split_na_array]}{[');
+  var tov_reason          = extractValueOrNA(strPar, '{[tov_reason]}{[');
+  var tov_reason_na       = extractValueOrNA(strPar, '{[tov_reason_array_na]}{[');
+  var ref_widget_id       = extractValueOrNA(strPar, '{[ref_widget_id]}{[');
+  var section_name        = extractValueOrNA(strPar, '{[section_name]}{[');
+  var shop_list           = extractValueOrNA(strPar, '{[shop_list]}{[');
+  var shop_list_full      = extractValueOrNA(strPar, '{[shop_list_full]}{[');
+  var rn_learn            = extractValueOrNA(strPar, '{[rn_learn]}{[');
+  var pers_listing        = extractValueOrNA(strPar, '{[pers_listing]}{[');
+  var pers_tov            = extractValueOrNA(strPar, '{[pers_tov]}{[');
+  var id_tov_boost        = extractValueOrNA(strPar, '{[id_tov_boost]}{[');
+  var id_boost            = extractValueOrNA(strPar, '{[id_boost]}{[');
+  var boost_position      = extractValueOrNA(strPar, '{[boost_position]}{[');
+  var product_detail      = extractValueOrNA(strPar, '{[product_detail]}{[');
+  var iminshop            = extractValueOrNA(strPar, '{[iminshop]}{[');
+  var chosenmark          = extractValueOrNA(strPar, '{[chosenmark]}{[');
+  var specialmark         = extractValueOrNA(strPar, '{[specialmark]}{[');
+  var lp_today            = extractValueOrNA(strPar, '{[lp_today]}{[');
+  var lp_tomorrow         = extractValueOrNA(strPar, '{[lp_tomorrow]}{[');
+  var amount              = extractValueOrNA(strPar, '{[amount]}{[');
+  var cart_qty            = extractValueOrNA(strPar, '{[cart_qty]}{[');
+  var stock               = extractValueOrNA(strPar, '{[stock]}{[');
+
+  // A — кейс, B — Действие, C — str_par, дальше поля по порядку
+  var row = [
+    caseName,          // A: Кейс
+    actionName,        // B: Действие (str_par)
+    strPar,            // C: str_par (полный)
+
+    id_order,          // D
+    category_id,       // E
+    button_name,       // F
+    id_screen,         // G
+    id_element,        // H
+    actionField,       // I
+    formname,          // J
+    search_bar,        // K
+    search_bar_fixed,  // L
+    tovs_subscribe,    // M
+    rn_tov,            // N
+    tovs_rn_shown_sort,// O
+    tovs_rn_disc_sort, // P
+    falseteasers_sh,   // Q
+    id_tov,            // R
+    tov_reason_real,   // S
+    tovs_rn_na_sort,   // T
+    tovs_rn_real_sort, // U
+    rn_green,          // V
+    rn_max,            // W
+    tovs_rn_archive,   // X
+    name_tov,          // Y
+    tovs_rn_arch_sort, // Z
+    widget_id,         // AA
+    widget_type,       // AB
+    widget_title,      // AC
+    group_list,        // AD
+    boost_array,       // AE
+    id_tov_boost_arr,  // AF
+    position_boost_arr,// AG
+    id_split_array,    // AH
+    boost_na_array,    // AI
+    id_tov_boost_na,   // AJ
+    position_boost_na, // AK
+    id_cohort,         // AL
+    id_split_na_array, // AM
+    tov_reason,        // AN
+    tov_reason_na,     // AO
+    ref_widget_id,     // AP
+    section_name,      // AQ
+    shop_list,         // AR
+    shop_list_full,    // AS
+    rn_learn,          // AT
+    pers_listing,      // AU
+    pers_tov,          // AV
+    id_tov_boost,      // AW
+    id_boost,          // AX
+    boost_position,    // AY
+    product_detail,    // AZ
+    iminshop,          // BA
+    chosenmark,        // BB
+    specialmark,       // BC
+    lp_today,          // BD
+    lp_tomorrow,       // BE
+    amount,            // BF
+    cart_qty,          // BG
+    stock              // BH
+  ];
+
+  sheet.appendRow(row);
+  return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ===== АВТООПРЕДЕЛЕНИЕ КЕЙСА С rn_tov =====
+function autoDetectCase(strPar) {
+  if (!strPar) return '';
+
+  var has = function (pattern) {
+    return strPar.indexOf(pattern) > -1;
+  };
+
+  var rn = extractRnTov(strPar);        // '1', '2', '7' ...
+  var suffix = rn ? rn + '-й' : '';     // '1-й', '7-й' ...
+
+  // Без rn_tov
+  if (has('{[id_element]}{[start]}')) {
+    return 'Тап_на_поиск';
+  }
+
+  if (has('{[id_element]}{[not_found]}') && has('{[search_bar]}{[1111]}')) {
+    return 'Ввести_запрос_по_которому_не_будет_выдачи_1111';
+  }
+
+  if (has('{[id_element]}{[carousel]}') && has('{[widget_title]}{[Товары не в наличии]}')) {
+    return 'Скролл_до_товаров_Не_в_наличии';
+  }
+  if (has('{[id_element]}{[filter]}')) {
+    return 'Тап_на_блок_фильтров';
+  }
+    if (has('{[id_element]}{[search_words]}') && has('{[action]}{[tap]}')) {
+    return 'Тап_на_подсказку_при_вводе';
+  }
+    // Переход в подсказки-классы
+  if (has('{[id_element]}{[search_links]}') &&
+      has('{[action]}{[tap]}') &&
+      has('{[widget_type]}{[category_tips]}')) {
+    return 'Переход_в_подсказки_классы';
+  }
+
+  if (has('{[button_name]}{[Доставить завтра]}')) {
+    return 'Тап_на_Доставить_завтра';
+  }
+
+  // Открытие карточки товара (твой кейс с product_detail и rn_tov=7)
+  if (has('{[id_element]}{[product_detail]}')) {
+    return rn ? ('Открыть_карточку_' + suffix + '_товара')
+              : 'Открыть_карточку_товара';
+  }
+
+  // Действия по товарам, номер берём из rn_tov
+  if (has('{[id_element]}{[add]}')) {
+    return rn ? ('Тап_В_корзину_на_' + suffix + '_товаре')
+              : 'Тап_В_корзину_на_товаре';
+  }
+
+  if (has('{[id_element]}{[plus]}')) {
+    return rn ? ('Прибавить_количество_' + suffix + '_товара_+')
+              : 'Прибавить_количество_товара_+';
+  }
+
+  if (has('{[id_element]}{[minus]}')) {
+    return rn ? ('Убавить_количество_' + suffix + '_товара_-')
+              : 'Убавить_количество_товара_-';
+  }
+
+  if (has('{[id_element]}{[edit]}')) {
+    return rn ? ('Изменить_количество_вручную_у_' + suffix + '_товара')
+              : 'Изменить_количество_вручную_у_товара';
+  }
+
+  if (has('{[id_element]}{[add_fav]}')) {
+    return rn ? ('Добавить_в_избранное_' + suffix + '_товар')
+              : 'Добавить_в_избранное_товар';
+  }
+
+  if (has('{[id_element]}{[del_fav]}')) {
+    return rn ? ('Убрать_из_избранного_' + suffix + '_товар')
+              : 'Убрать_из_избранного_товар';
+  }
+
+  if (has('{[id_element]}{[add_list]}')) {
+    return rn ? ('Нажать_на_кнопку_Добавить_в_список_у_' + suffix + '_товара')
+              : 'Нажать_на_кнопку_Добавить_в_список_у_товара';
+  }
+
+  if (has('{[id_element]}{[back]}')) {
+    return 'Тап_назад';
+  }
+
+  return ''; // неизвестный кейс → пусто
+}
+
+// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+function extractStrPar(formBody) {
+  if (!formBody) return '';
+  var parts = formBody.split('&');
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (p.indexOf('str_par=') === 0) {
+      var encoded = p.substring('str_par='.length);
+      return decodeURIComponent(encoded.replace(/\+/g, '%20'));
+    }
+  }
+  return formBody;
+}
+
+function extractValueOrNA(text, marker) {
+  if (!text) return '_N\\A_';
+  var start = text.indexOf(marker);
+  if (start === -1) return '_N\\A_';
+  start = start + marker.length;
+  var end = text.indexOf(']}', start);
+  if (end === -1) return '_N\\A_';
+  var val = text.substring(start, end).trim();
+  if (val === '[]' || val === '') return '';
+  return val;
+}
+
+// вытащить rn_tov из str_par
+function extractRnTov(strPar) {
+  if (!strPar) return '';
+  var marker = '{[rn_tov]}{[';
+  var start = strPar.indexOf(marker);
+  if (start === -1) return '';
+  start += marker.length;
+  var end = strPar.indexOf(']}', start);
+  if (end === -1) return '';
+  return strPar.substring(start, end).trim();
+}
+
