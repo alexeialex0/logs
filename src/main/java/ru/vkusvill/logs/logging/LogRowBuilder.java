@@ -1,7 +1,6 @@
-package ru.vkusvill.logs;
+package ru.vkusvill.logs.logging;
 
 import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 

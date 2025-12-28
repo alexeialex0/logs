@@ -1,4 +1,4 @@
-package ru.vkusvill.logs;
+package ru.vkusvill.logs.proxy;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +8,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import ru.vkusvill.logs.logging.CsvLogWriter;
+import ru.vkusvill.logs.logging.LogRecord;
+import ru.vkusvill.logs.logging.LogRowBuilder;
+import ru.vkusvill.logs.monitor.LogSseBroadcaster;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -18,14 +22,17 @@ public class LogProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LogProxyController.class);
 
-    // только backend, без Google Script
     private static final String BACKEND_URL =
-            "урл_ВВ_Логов";
+            "твой_урл_логов_ВВ";
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final LogRowBuilder logRowBuilder = new LogRowBuilder();
-    // logs.csv лежит в корне проекта рядом с pom.xml
     private final CsvLogWriter csvLogWriter = new CsvLogWriter("logs.csv");
+    private final LogSseBroadcaster broadcaster;
+
+    public LogProxyController(LogSseBroadcaster broadcaster) {
+        this.broadcaster = broadcaster;
+    }
 
     @PostMapping("/log-proxy")
     public ResponseEntity<String> handleLog(
@@ -34,16 +41,15 @@ public class LogProxyController {
 
         log.info("Received log body length={}", body.length());
 
-        // 1. Парсинг и запись строки в CSV
         try {
             List<String> row = logRowBuilder.buildRow(body, null);
             csvLogWriter.appendRow(row);
-            log.info("Row appended to logs.csv, columns={}", row.size());
+            broadcaster.broadcast(new LogRecord(row));
+            log.info("Row appended and broadcast, columns={}", row.size());
         } catch (Exception e) {
-            log.error("Error building or writing CSV row", e);
+            log.error("Error building/writing/broadcasting log row", e);
         }
 
-        // 2. Форвард в backend, как раньше
         return forwardToBackend(body, headersMap);
     }
 
@@ -65,7 +71,7 @@ public class LogProxyController {
                 backendHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
             }
 
-            HttpEntity<String> backendRequest = new HttpEntity<>(body, backendHeaders);
+            HttpEntity<String> backendRequest = new HttpEntity<String>(body, backendHeaders);
             ResponseEntity<byte[]> backendResponse =
                     restTemplate.exchange(BACKEND_URL, HttpMethod.POST, backendRequest, byte[].class);
 
@@ -79,7 +85,7 @@ public class LogProxyController {
                     ? ""
                     : new String(respBodyBytes, StandardCharsets.UTF_8);
 
-            return new ResponseEntity<>(respBody, respHeaders, backendResponse.getStatusCode());
+            return new ResponseEntity<String>(respBody, respHeaders, backendResponse.getStatusCode());
 
         } catch (Exception ex) {
             log.error("Error forwarding to backend", ex);
@@ -89,10 +95,13 @@ public class LogProxyController {
     }
 
     private void copyHeader(Map<String, String> from, HttpHeaders to, String nameLower) {
-        from.forEach((k, v) -> {
+        for (Map.Entry<String, String> entry : from.entrySet()) {
+            String k = entry.getKey();
+            String v = entry.getValue();
             if (k != null && k.equalsIgnoreCase(nameLower)) {
                 to.add(k, v);
             }
-        });
+        }
     }
 }
+

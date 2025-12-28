@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Монитор логов</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 3px 5px; }
+    th { background-color: #f2f2f2; position: sticky; top: 0; z-index: 1; }
+    tr.session-marker { background-color: #ffeeba; }
+    tr.commented { background-color: #e8f5e9; }
+    td.commented-cell { border-color: #4caf50; box-shadow: inset 0 0 0 1px #4caf50; }
+    #commentBox { position: fixed; right: 10px; bottom: 10px; width: 340px;
+      border: 1px solid #ccc; padding: 8px; background: #fff; }
+    #commentBox.hidden { display: none; }
+    #logContainer { max-height: 80vh; overflow-x: auto; overflow-y: auto; }
+    .cell-long {
+      max-width: 260px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+<h3>Монитор логов</h3>
+<div id="logContainer">
+  <table id="logTable">
+    <thead>
+    <tr>
+      <th>#</th>
+      <th>Кейсы</th>
+      <th>Действие</th>
+      <th>str_par</th>
+      <th>id_order</th>
+      <th>category_id</th>
+      <th>button_name</th>
+      <th>id_screen</th>
+      <th>id_element</th>
+      <th>action</th>
+      <th>formname</th>
+      <th>search_bar</th>
+      <th>search_bar_fixed</th>
+      <th>tovs_subscribe_shown</th>
+      <th>rn_tov</th>
+      <th>tovs_rn_shown_sort</th>
+      <th>tovs_rn_shown_discount_sort</th>
+      <th>falseteasers_shown</th>
+      <th>[id_tov]</th>
+      <th>tov_reason_array_real</th>
+      <th>tovs_rn_na_sort</th>
+      <th>tovs_rn_real_sort</th>
+      <th>rn_green</th>
+      <th>rn_max</th>
+      <th>tovs_rn_archive</th>
+      <th>name_tov</th>
+      <th>tovs_rn_archive_sort</th>
+      <th>widget_id</th>
+      <th>widget_type</th>
+      <th>widget_title</th>
+      <th>group_list</th>
+      <th>boost_array</th>
+      <th>id_tov_boost_array</th>
+      <th>position_boost_array</th>
+      <th>id_split_array</th>
+      <th>boost_na_array</th>
+      <th>id_tov_boost_na_array</th>
+      <th>position_boost_na_array</th>
+      <th>id_cohort</th>
+      <th>id_split_na_array</th>
+      <th>tov_reason</th>
+      <th>tov_reason_array_na</th>
+      <th>ref_widget_id</th>
+      <th>section_name</th>
+      <th>shop_list</th>
+      <th>shop_list_full</th>
+      <th>rn_learn</th>
+      <th>pers_listing</th>
+      <th>pers_tov</th>
+      <th>id_tov_boost</th>
+      <th>[id_boost]</th>
+      <th>[boost_position]</th>
+      <th>product_detail</th>
+      <th>iminshop</th>
+      <th>chosenmark</th>
+      <th>specialmark</th>
+      <th>lp_today</th>
+      <th>lp_tomorrow</th>
+      <th>amount</th>
+      <th>cart_qty</th>
+      <th>stock</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div id="commentBox" class="hidden">
+  <div><b>Комментарий к строке <span id="commentRowIndex"></span>,
+    колонка <span id="commentColIndex"></span></b></div>
+  <textarea id="commentText" rows="4" style="width: 100%;"></textarea>
+  <div style="margin-top: 6px; text-align: right;">
+    <button onclick="closeComment()">Отмена</button>
+    <button onclick="saveComment()">Сохранить</button>
+  </div>
+</div>
+
+<script>
+  const tableBody = document.querySelector('#logTable tbody');
+  const commentBox = document.getElementById('commentBox');
+  const commentRowIndexSpan = document.getElementById('commentRowIndex');
+  const commentColIndexSpan = document.getElementById('commentColIndex');
+  const commentTextArea = document.getElementById('commentText');
+
+  // comments[rowIndex][colIndex] = text
+  let comments = {};
+
+  function formatShort(value) {
+    if (!value) return '';
+    const parts = value.split(/[,;]/);
+    if (parts.length <= 4) return value;
+    return parts.slice(0, 4).join(',') + ' ...';
+  }
+
+  function addRow(columns, initial) {
+    const row = document.createElement('tr');
+    const index = tableBody.rows.length + 1;
+
+    const caseName = columns.length > 0 ? columns[0] : '';
+    if (caseName && caseName.indexOf('НОВАЯ_СЕССИЯ') === 0) {
+      row.classList.add('session-marker');
+    }
+
+    const idxCell = document.createElement('td');
+    idxCell.textContent = index;
+    row.appendChild(idxCell);
+
+    for (let i = 0; i < columns.length; i++) {
+      const cell = document.createElement('td');
+      const value = columns[i] || '';
+
+      const rowIndex = index;
+      const colIndex = i + 1; // 0-я колонка — номер
+
+      // только str_par (i === 2) показываем в сокращённом виде
+      if (i === 2) {
+        const shortVal = formatShort(value);
+        cell.classList.add('cell-long');
+        cell.setAttribute('data-full', value);
+        cell.setAttribute('data-short', shortVal);
+        cell.setAttribute('data-expanded', 'false');
+        cell.textContent = shortVal;
+        cell.title = value; // полный текст по hover
+      } else {
+        cell.textContent = value;
+      }
+
+      cell.addEventListener('click', function () {
+        // сначала логика сворачивания/разворачивания для str_par
+        if (i === 2) {
+          const expanded = cell.getAttribute('data-expanded') === 'true';
+          const full = cell.getAttribute('data-full');
+          const shortVal = cell.getAttribute('data-short');
+          cell.setAttribute('data-expanded', expanded ? 'false' : 'true');
+          cell.textContent = expanded ? shortVal : full;
+        }
+        // затем открываем окно комментария
+        openComment(rowIndex, colIndex, cell);
+      });
+
+      const existing = getComment(rowIndex, colIndex);
+      if (existing) {
+        cell.classList.add('commented-cell');
+        // title уже может быть для str_par, поэтому дополняем
+        const baseTitle = cell.title || value;
+        cell.title = baseTitle + "\n\nКомментарий: " + existing;
+        row.classList.add('commented');
+      }
+
+      row.appendChild(cell);
+    }
+
+    tableBody.appendChild(row);
+
+    if (!initial) {
+      const container = document.getElementById('logContainer');
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  function getComment(rowIndex, colIndex) {
+    const rowComments = comments[rowIndex];
+    if (!rowComments) return '';
+    return rowComments[colIndex] || '';
+  }
+
+  function setComment(rowIndex, colIndex, text) {
+    if (!comments[rowIndex]) {
+      comments[rowIndex] = {};
+    }
+    comments[rowIndex][colIndex] = text;
+  }
+
+  function openComment(rowIndex, colIndex, cell) {
+    commentRowIndexSpan.textContent = rowIndex;
+    commentColIndexSpan.textContent = colIndex;
+    commentBox.dataset.rowIndex = rowIndex;
+    commentBox.dataset.colIndex = colIndex;
+
+    commentTextArea.value = getComment(rowIndex, colIndex) || '';
+    commentBox.classList.remove('hidden');
+    commentTextArea.focus();
+  }
+
+  function closeComment() {
+    commentBox.classList.add('hidden');
+  }
+
+  function saveComment() {
+    const rowIndex = parseInt(commentBox.dataset.rowIndex, 10);
+    const colIndex = parseInt(commentBox.dataset.colIndex, 10);
+    const text = commentTextArea.value || '';
+
+    setComment(rowIndex, colIndex, text);
+
+    const rows = tableBody.rows;
+    if (rowIndex >= 1 && rowIndex <= rows.length) {
+      const row = rows[rowIndex - 1];
+      const cell = row.cells[colIndex];
+
+      const baseValue = cell.textContent || '';
+      const baseTitle = cell.getAttribute('data-full') || cell.title || baseValue;
+
+      if (text) {
+        cell.classList.add('commented-cell');
+        cell.title = baseTitle + "\n\nКомментарий: " + text;
+        row.classList.add('commented');
+      } else {
+        cell.classList.remove('commented-cell');
+        cell.title = baseTitle;
+        const rowComments = comments[rowIndex] || {};
+        const hasAny = Object.keys(rowComments).some(function (k) {
+          return rowComments[k] && rowComments[k].length > 0;
+        });
+        if (!hasAny) {
+          row.classList.remove('commented');
+        }
+      }
+    }
+
+    closeComment();
+  }
+
+  async function loadInitial() {
+    try {
+      const resp = await fetch('/logs/last?limit=50');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      data.forEach(function (rec) {
+        const cols = rec.columns || rec;
+        addRow(cols, true);
+      });
+    } catch (e) {
+      console.error('Error loading initial logs', e);
+    }
+  }
+
+  function connectSse() {
+    const es = new EventSource('/logs/stream');
+    es.addEventListener('log', function (event) {
+      try {
+        const cols = JSON.parse(event.data);
+        addRow(cols, false);
+      } catch (e) {
+        console.error('Error in SSE event', e);
+      }
+    });
+    es.onerror = function (e) {
+      console.error('SSE error', e);
+    };
+  }
+
+  loadInitial();
+  connectSse();
+</script>
+</body>
+</html>
+
+
+
+
+const idxCell = document.createElement('td');
+    idxCell.textContent = index;
+    row.appendChild(idxCell);
+
+    const caseCell = document.createElement('td');
+    caseCell.textContent = caseName;
+    row.appendChild(caseCell);
+
+    const actionCell = document.createElement('td');
+    actionCell.textContent = action;
+    row.appendChild(actionCell);
+
+    const strParCell = document.createElement('td');
+    strParCell.textContent = strPar;
+    row.appendChild(strParCell);
+
+    const commentCell = document.createElement('td');
+    commentCell.classList.add('comment-cell');
+    commentCell.textContent = comments[index] || '';
+    commentCell.addEventListener('click', function () {
+      openComment(index, commentCell);
+    });
+    row.appendChild(commentCell);
+
+    tableBody.appendChild(row);
+
+    if (!initial) {
+      const container = document.getElementById('logContainer');
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  function openComment(rowIndex, cell) {
+    commentRowIndexSpan.textContent = rowIndex;
+    commentTextArea.value = comments[rowIndex] || '';
+    commentBox.dataset.rowIndex = rowIndex;
+    commentBox.dataset.cellId = rowIndex;
+    commentBox.classList.remove('hidden');
+    commentTextArea.focus();
+  }
+
+  function closeComment() {
+    commentBox.classList.add('hidden');
+  }
+
+  function saveComment() {
+    const rowIndex = parseInt(commentBox.dataset.rowIndex, 10);
+    const text = commentTextArea.value || '';
+    comments[rowIndex] = text;
+
+    const rows = tableBody.rows;
+    if (rowIndex >= 1 && rowIndex <= rows.length) {
+      const row = rows[rowIndex - 1];
+      const commentCell = row.cells[4];
+      commentCell.textContent = text;
+      if (text) {
+        row.classList.add('commented');
+      } else {
+        row.classList.remove('commented');
+      }
+    }
+
+    closeComment();
+    // здесь позже можно добавить отправку комментария на backend
+  }
+
+  async function loadInitial() {
+    try {
+      const resp = await fetch('/logs/last?limit=50');
+      if (!resp.ok) return;
+      const data = await resp.json(); // массив LogRecord, у каждого есть поле columns
+      data.forEach(function (rec) {
+        addRow(rec.columns, true);
+      });
+    } catch (e) {
+      console.error('Error loading initial logs', e);
+    }
+  }
+
+  function connectSse() {
+    const es = new EventSource('/logs/stream');
+    es.addEventListener('log', function (event) {
+      try {
+        const cols = JSON.parse(event.data); // broadcaster.send(columns)
+        addRow(cols, false);
+      } catch (e) {
+        console.error('Error in SSE event', e);
+      }
+    });
+    es.onerror = function (e) {
+      console.error('SSE error', e);
+    };
+  }
+
+  loadInitial();
+  connectSse();
+</script>
+</body>
+</html>
