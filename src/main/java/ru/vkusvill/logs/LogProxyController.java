@@ -20,7 +20,7 @@ public class LogProxyController {
 
     // только backend, без Google Script
     private static final String BACKEND_URL =
-            "https://mobile-logs.vkusvill.ru/api/sql/exec/?func=Loyalty.dbo.universal_log_insert";
+            "урл_ВВ_Логов";
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final LogRowBuilder logRowBuilder = new LogRowBuilder();
