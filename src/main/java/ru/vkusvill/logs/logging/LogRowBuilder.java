@@ -101,7 +101,7 @@ public class LogRowBuilder {
                     : "Открыть_карточку_" + suffix + "_товара";
         }
 
-        if (has.test("{[id_element]}}{[add]}")) {
+        if (has.test("{[id_element]}{[add]}")) {
             return suffix.length() == 0
                     ? "Тап_В_корзину_на_товаре"
                     : "Тап_В_корзину_на_" + suffix + "_товаре";
@@ -152,9 +152,11 @@ public class LogRowBuilder {
 
     public List<String> buildRow(String formBody, String caseNameFromRequest) {
         String strPar = extractStrPar(formBody);
-
+        String number = extractValueOrNA(strPar, "{[number]}{[");
+        String date_add = extractValueOrNA(strPar, "{[date_add]}{[");
         String autoCase = autoDetectCase(strPar);
         String caseName;
+
         if (caseNameFromRequest != null && caseNameFromRequest.trim().length() > 0) {
             caseName = caseNameFromRequest;
         } else {
@@ -224,6 +226,8 @@ public class LogRowBuilder {
         row.add("str_par");         // B: Действие
         row.add(strPar);            // C: str_par
 
+        row.add(number);
+        row.add(date_add);
         row.add(id_order);
         row.add(category_id);
         row.add(button_name);

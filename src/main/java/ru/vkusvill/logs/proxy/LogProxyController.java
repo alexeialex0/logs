@@ -23,7 +23,7 @@ public class LogProxyController {
     private static final Logger log = LoggerFactory.getLogger(LogProxyController.class);
 
     private static final String BACKEND_URL =
-            "твой_урл_логов_ВВ";
+            "https://mobile-logs.vkusvill.ru/api/sql/exec/?func=Loyalty.dbo.universal_log_insert";
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final LogRowBuilder logRowBuilder = new LogRowBuilder();
