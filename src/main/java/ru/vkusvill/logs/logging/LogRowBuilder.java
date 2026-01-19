@@ -216,6 +216,7 @@ public class LogRowBuilder {
         String chosenmark          = extractValueOrNA(strPar, "{[chosenmark]}{[");
         String specialmark         = extractValueOrNA(strPar, "{[specialmark]}{[");
         String lp_today            = extractValueOrNA(strPar, "{[lp_today]}{[");
+        String greenmark = extractValueOrNA(strPar, "{[greenmark]}{[");
         String lp_tomorrow         = extractValueOrNA(strPar, "{[lp_tomorrow]}{[");
         String amount              = extractValueOrNA(strPar, "{[amount]}{[");
         String cart_qty            = extractValueOrNA(strPar, "{[cart_qty]}{[");

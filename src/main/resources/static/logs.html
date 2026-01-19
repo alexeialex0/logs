@@ -39,6 +39,18 @@
       border-radius: 2px;
       box-sizing: border-box;
     }
+    .delete-btn {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      padding: 2px 5px;
+      cursor: pointer;
+      font-size: 10px;
+      border-radius: 3px;
+    }
+    .delete-btn:hover {
+      background-color: #d32f2f;
+    }
   </style>
 </head>
 <body>
@@ -48,6 +60,7 @@
     <thead>
     <tr>
       <th>#</th>
+      <th>Удалить</th>
       <th>Кейсы</th>
       <th>Действие</th>
       <th>str_par</th>
@@ -106,6 +119,7 @@
       <th>chosenmark</th>
       <th>specialmark</th>
       <th>lp_today</th>
+      <th>greenmark</th>
       <th>lp_tomorrow</th>
       <th>amount</th>
       <th>cart_qty</th>
@@ -143,8 +157,9 @@
   let logGroupTimer = null;
   let pendingLogs = [];
 
-  // Данные логов (для сохранения изменений)
+  // Данные логов (для сохранения изменений и удаления)
   let logDataArray = [];
+  let rowMapping = []; // сопоставление строк таблицы с индексами в logDataArray
 
   function formatShort(value) {
     if (!value) return '';
@@ -157,9 +172,11 @@
     const row = document.createElement('tr');
     const index = tableBody.rows.length + 1;
 
-    // Сохраняем данные для возможного редактирования
+    // Сохраняем данные для возможного редактирования и удаления
+    const logDataIndex = logDataArray.length;
     const logData = [...columns];
     logDataArray.push(logData);
+    rowMapping.push(logDataIndex);
 
     const caseName = columns.length > 0 ? columns[0] : '';
     if (caseName && caseName.indexOf('НОВАЯ_СЕССИЯ') === 0) {
@@ -170,12 +187,24 @@
     idxCell.textContent = index;
     row.appendChild(idxCell);
 
+    // Добавляем кнопку удаления
+    const deleteCell = document.createElement('td');
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.textContent = '×';
+    deleteBtn.title = 'Удалить строку';
+    deleteBtn.addEventListener('click', function() {
+      deleteRow(row, logDataIndex);
+    });
+    deleteCell.appendChild(deleteBtn);
+    row.appendChild(deleteCell);
+
     for (let i = 0; i < columns.length; i++) {
       const cell = document.createElement('td');
       const value = columns[i] || '';
 
       const rowIndex = index;
-      const colIndex = i + 1; // 0-я колонка — номер
+      const colIndex = i + 2; // 0-я колонка — номер, 1-я — удалить, 2-я — кейсы
 
       // только str_par (i === 2) показываем в сокращённом виде
       if (i === 2) {
@@ -190,14 +219,14 @@
         cell.textContent = value;
       }
 
-      // Сделать колонку "Кейсы" (индекс 1 в данных, индекс 2 в таблице) редактируемой
+      // Сделать колонку "Кейсы" (индекс 0 в данных) редактируемой
       if (i === 0) { // колонка "Кейсы" в данных
         cell.classList.add('editable-cell');
-        cell.setAttribute('data-row-index', index - 1); // индекс в массиве данных
+        cell.setAttribute('data-row-index', logDataIndex); // индекс в массиве данных
         cell.setAttribute('data-col-index', 0); // индекс колонки в данных
 
         cell.addEventListener('dblclick', function() {
-          editCell(this, rowIndex - 1, 0);
+          editCell(this, logDataIndex, 0);
         });
       }
 
@@ -232,6 +261,44 @@
       const container = document.getElementById('logContainer');
       container.scrollTop = container.scrollHeight;
     }
+  }
+
+  // Функция для удаления строки
+  function deleteRow(rowElement, logDataIndex) {
+    if (confirm('Вы уверены, что хотите удалить эту строку?')) {
+      // Найдем индекс строки в таблице
+      const rowIndexInTable = Array.from(tableBody.children).indexOf(rowElement);
+
+      // Удаляем из DOM
+      rowElement.remove();
+
+      // Удаляем из массива данных
+      logDataArray.splice(logDataIndex, 1);
+
+      // Обновляем mapping
+      rowMapping = rowMapping.filter(index => index !== logDataIndex);
+
+      // Пересчитываем индексы в rowMapping
+      for (let i = 0; i < rowMapping.length; i++) {
+        if (rowMapping[i] > logDataIndex) {
+          rowMapping[i]--;
+        }
+      }
+
+      // Обновляем номера строк
+      updateRowNumbers();
+    }
+  }
+
+  // Функция для обновления номеров строк
+  function updateRowNumbers() {
+    const rows = tableBody.querySelectorAll('tr');
+    rows.forEach((row, index) => {
+      const firstCell = row.cells[0]; // номер строки
+      if (firstCell) {
+        firstCell.textContent = index + 1;
+      }
+    });
   }
 
   // Функция для редактирования ячейки
