@@ -9,8 +9,12 @@
     th, td { border: 1px solid #ddd; padding: 3px 5px; }
     th { background-color: #f2f2f2; position: sticky; top: 0; z-index: 1; }
     tr.session-marker { background-color: #ffeeba; }
-    tr.commented { background-color: #ffebee;; }
+    tr.commented { background-color: #ffebee; }
     td.commented-cell { border-color: #f44336; box-shadow: inset 0 0 0 1px #f44336; }
+    .empty-row {
+      height: 15px;
+      background-color: #f5f5f5;
+    }
     #commentBox { position: fixed; right: 10px; bottom: 10px; width: 340px;
       border: 1px solid #ccc; padding: 8px; background: #fff; }
     #commentBox.hidden { display: none; }
@@ -20,6 +24,20 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .editable-cell {
+      cursor: pointer;
+      position: relative;
+    }
+    .editable-cell:hover {
+      background-color: #f0f8ff;
+    }
+    .input-edit {
+      width: 100%;
+      padding: 2px;
+      border: 1px solid #ccc;
+      border-radius: 2px;
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -115,8 +133,18 @@
   const commentColIndexSpan = document.getElementById('commentColIndex');
   const commentTextArea = document.getElementById('commentText');
 
+  // Количество колонок в таблице (для span в пустой строке)
+  const colCount = document.querySelectorAll('#logTable thead th').length;
+
   // comments[rowIndex][colIndex] = text
   let comments = {};
+
+  // Переменные для группировки логов
+  let logGroupTimer = null;
+  let pendingLogs = [];
+
+  // Данные логов (для сохранения изменений)
+  let logDataArray = [];
 
   function formatShort(value) {
     if (!value) return '';
@@ -128,6 +156,10 @@
   function addRow(columns, initial) {
     const row = document.createElement('tr');
     const index = tableBody.rows.length + 1;
+
+    // Сохраняем данные для возможного редактирования
+    const logData = [...columns];
+    logDataArray.push(logData);
 
     const caseName = columns.length > 0 ? columns[0] : '';
     if (caseName && caseName.indexOf('НОВАЯ_СЕССИЯ') === 0) {
@@ -156,6 +188,17 @@
         cell.title = value; // полный текст по hover
       } else {
         cell.textContent = value;
+      }
+
+      // Сделать колонку "Кейсы" (индекс 1 в данных, индекс 2 в таблице) редактируемой
+      if (i === 0) { // колонка "Кейсы" в данных
+        cell.classList.add('editable-cell');
+        cell.setAttribute('data-row-index', index - 1); // индекс в массиве данных
+        cell.setAttribute('data-col-index', 0); // индекс колонки в данных
+
+        cell.addEventListener('dblclick', function() {
+          editCell(this, rowIndex - 1, 0);
+        });
       }
 
       cell.addEventListener('click', function () {
@@ -189,6 +232,104 @@
       const container = document.getElementById('logContainer');
       container.scrollTop = container.scrollHeight;
     }
+  }
+
+  // Функция для редактирования ячейки
+  function editCell(cell, dataIndex, colIndex) {
+    const currentValue = logDataArray[dataIndex][colIndex] || '';
+
+    // Создаем input для редактирования
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'input-edit';
+    input.value = currentValue;
+    input.style.width = '100%';
+
+    // Сохраняем старое значение для отмены
+    const originalContent = cell.innerHTML;
+
+    // Заменяем содержимое ячейки на input
+    cell.innerHTML = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+
+    // Функция для сохранения изменений
+    function saveChanges() {
+      if (input.value !== currentValue) {
+        // Обновляем данные
+        logDataArray[dataIndex][colIndex] = input.value;
+
+        // Обновляем отображение
+        cell.innerHTML = input.value;
+        cell.classList.add('editable-cell');
+
+        // Восстанавливаем события
+        cell.addEventListener('dblclick', function() {
+          editCell(this, dataIndex, colIndex);
+        });
+      } else {
+        // Если значение не изменилось, просто восстанавливаем ячейку
+        cell.innerHTML = originalContent;
+        cell.classList.add('editable-cell');
+
+        // Восстанавливаем события
+        cell.addEventListener('dblclick', function() {
+          editCell(this, dataIndex, colIndex);
+        });
+      }
+    }
+
+    // Обработчики событий для сохранения изменений
+    input.addEventListener('blur', saveChanges);
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        saveChanges();
+      } else if (e.key === 'Escape') {
+        // Отмена редактирования
+        cell.innerHTML = originalContent;
+        cell.classList.add('editable-cell');
+
+        // Восстанавливаем события
+        cell.addEventListener('dblclick', function() {
+          editCell(this, dataIndex, colIndex);
+        });
+      }
+    });
+  }
+
+  // Функция для добавления лога в группу
+  function addToLogGroup(columns) {
+    pendingLogs.push(columns);
+
+    // Очищаем предыдущий таймер
+    if (logGroupTimer) {
+      clearTimeout(logGroupTimer);
+    }
+
+    // Устанавливаем таймер на 1 секунду
+    logGroupTimer = setTimeout(() => {
+      // Добавляем все накопленные логи
+      pendingLogs.forEach(logData => {
+        addRow(logData, false);
+      });
+
+      // Добавляем пустую строку после группы
+      const emptyRow = document.createElement('tr');
+      emptyRow.classList.add('empty-row');
+      const emptyCell = document.createElement('td');
+      emptyCell.colSpan = colCount;
+      emptyRow.appendChild(emptyCell);
+      tableBody.appendChild(emptyRow);
+
+      // Очищаем очередь
+      pendingLogs = [];
+
+      // Прокручиваем вниз
+      const container = document.getElementById('logContainer');
+      container.scrollTop = container.scrollHeight;
+    }, 1000); // 1 секунда ожидания перед добавлением группы
   }
 
   function getComment(rowIndex, colIndex) {
@@ -273,110 +414,7 @@
     es.addEventListener('log', function (event) {
       try {
         const cols = JSON.parse(event.data);
-        addRow(cols, false);
-      } catch (e) {
-        console.error('Error in SSE event', e);
-      }
-    });
-    es.onerror = function (e) {
-      console.error('SSE error', e);
-    };
-  }
-
-  loadInitial();
-  connectSse();
-</script>
-</body>
-</html>
-
-
-
-
-const idxCell = document.createElement('td');
-    idxCell.textContent = index;
-    row.appendChild(idxCell);
-
-    const caseCell = document.createElement('td');
-    caseCell.textContent = caseName;
-    row.appendChild(caseCell);
-
-    const actionCell = document.createElement('td');
-    actionCell.textContent = action;
-    row.appendChild(actionCell);
-
-    const strParCell = document.createElement('td');
-    strParCell.textContent = strPar;
-    row.appendChild(strParCell);
-
-    const commentCell = document.createElement('td');
-    commentCell.classList.add('comment-cell');
-    commentCell.textContent = comments[index] || '';
-    commentCell.addEventListener('click', function () {
-      openComment(index, commentCell);
-    });
-    row.appendChild(commentCell);
-
-    tableBody.appendChild(row);
-
-    if (!initial) {
-      const container = document.getElementById('logContainer');
-      container.scrollTop = container.scrollHeight;
-    }
-  }
-
-  function openComment(rowIndex, cell) {
-    commentRowIndexSpan.textContent = rowIndex;
-    commentTextArea.value = comments[rowIndex] || '';
-    commentBox.dataset.rowIndex = rowIndex;
-    commentBox.dataset.cellId = rowIndex;
-    commentBox.classList.remove('hidden');
-    commentTextArea.focus();
-  }
-
-  function closeComment() {
-    commentBox.classList.add('hidden');
-  }
-
-  function saveComment() {
-    const rowIndex = parseInt(commentBox.dataset.rowIndex, 10);
-    const text = commentTextArea.value || '';
-    comments[rowIndex] = text;
-
-    const rows = tableBody.rows;
-    if (rowIndex >= 1 && rowIndex <= rows.length) {
-      const row = rows[rowIndex - 1];
-      const commentCell = row.cells[4];
-      commentCell.textContent = text;
-      if (text) {
-        row.classList.add('commented');
-      } else {
-        row.classList.remove('commented');
-      }
-    }
-
-    closeComment();
-    // здесь позже можно добавить отправку комментария на backend
-  }
-
-  async function loadInitial() {
-    try {
-      const resp = await fetch('/logs/last?limit=50');
-      if (!resp.ok) return;
-      const data = await resp.json(); // массив LogRecord, у каждого есть поле columns
-      data.forEach(function (rec) {
-        addRow(rec.columns, true);
-      });
-    } catch (e) {
-      console.error('Error loading initial logs', e);
-    }
-  }
-
-  function connectSse() {
-    const es = new EventSource('/logs/stream');
-    es.addEventListener('log', function (event) {
-      try {
-        const cols = JSON.parse(event.data); // broadcaster.send(columns)
-        addRow(cols, false);
+        addToLogGroup(cols); // Используем новую функцию для группировки
       } catch (e) {
         console.error('Error in SSE event', e);
       }
