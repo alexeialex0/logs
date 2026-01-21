@@ -10,7 +10,9 @@
     th { background-color: #f2f2f2; position: sticky; top: 0; z-index: 1; }
     tr.session-marker { background-color: #ffeeba; }
     tr.commented { background-color: #ffebee; }
+    tr.commented-green { background-color: #e8f5e9; }
     td.commented-cell { border-color: #f44336; box-shadow: inset 0 0 0 1px #f44336; }
+    td.commented-cell-green { border-color: #4caf50; box-shadow: inset 0 0 0 1px #4caf50; }
     .empty-row {
       height: 15px;
       background-color: #f5f5f5;
@@ -50,6 +52,33 @@
     }
     .delete-btn:hover {
       background-color: #d32f2f;
+    }
+    .color-selector {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+    }
+    .color-option {
+      margin-right: 10px;
+      display: flex;
+      align-items: center;
+    }
+    .color-circle {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      margin-right: 5px;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .color-circle.selected {
+      border-color: #333;
+    }
+    .red-color {
+      background-color: #f44336;
+    }
+    .green-color {
+      background-color: #4caf50;
     }
   </style>
 </head>
@@ -119,7 +148,6 @@
       <th>chosenmark</th>
       <th>specialmark</th>
       <th>lp_today</th>
-      <th>greenmark</th>
       <th>lp_tomorrow</th>
       <th>amount</th>
       <th>cart_qty</th>
@@ -134,6 +162,18 @@
   <div><b>Комментарий к строке <span id="commentRowIndex"></span>,
     колонка <span id="commentColIndex"></span></b></div>
   <textarea id="commentText" rows="4" style="width: 100%;"></textarea>
+
+  <div class="color-selector">
+    <div class="color-option">
+      <div class="color-circle red-color selected" data-color="red"></div>
+      <label>Красный</label>
+    </div>
+    <div class="color-option">
+      <div class="color-circle green-color" data-color="green"></div>
+      <label>Зеленый</label>
+    </div>
+  </div>
+
   <div style="margin-top: 6px; text-align: right;">
     <button onclick="closeComment()">Отмена</button>
     <button onclick="saveComment()">Сохранить</button>
@@ -150,7 +190,7 @@
   // Количество колонок в таблице (для span в пустой строке)
   const colCount = document.querySelectorAll('#logTable thead th').length;
 
-  // comments[rowIndex][colIndex] = text
+  // comments[rowIndex][colIndex] = {text: '', color: ''}
   let comments = {};
 
   // Переменные для группировки логов
@@ -245,11 +285,17 @@
 
       const existing = getComment(rowIndex, colIndex);
       if (existing) {
-        cell.classList.add('commented-cell');
+        // Применяем стиль в зависимости от цвета комментария
+        if (existing.color === 'green') {
+          cell.classList.add('commented-cell-green');
+          row.classList.add('commented-green');
+        } else {
+          cell.classList.add('commented-cell');
+          row.classList.add('commented');
+        }
         // title уже может быть для str_par, поэтому дополняем
         const baseTitle = cell.title || value;
-        cell.title = baseTitle + "\n\nКомментарий: " + existing;
-        row.classList.add('commented');
+        cell.title = baseTitle + "\n\nКомментарий: " + existing.text;
       }
 
       row.appendChild(cell);
@@ -366,6 +412,124 @@
     });
   }
 
+  function getComment(rowIndex, colIndex) {
+    const rowComments = comments[rowIndex];
+    if (!rowComments) return null;
+    return rowComments[colIndex] || null;
+  }
+
+  function setComment(rowIndex, colIndex, text, color) {
+    if (!comments[rowIndex]) {
+      comments[rowIndex] = {};
+    }
+    comments[rowIndex][colIndex] = {text: text, color: color};
+  }
+
+  function openComment(rowIndex, colIndex, cell) {
+    commentRowIndexSpan.textContent = rowIndex;
+    commentColIndexSpan.textContent = colIndex;
+    commentBox.dataset.rowIndex = rowIndex;
+    commentBox.dataset.colIndex = colIndex;
+
+    const existing = getComment(rowIndex, colIndex);
+    if (existing) {
+      commentTextArea.value = existing.text || '';
+      // Устанавливаем выбранный цвет
+      document.querySelectorAll('.color-circle').forEach(circle => {
+        circle.classList.remove('selected');
+      });
+      const selectedColor = existing.color || 'red';
+      document.querySelector(`.color-circle[data-color="${selectedColor}"]`).classList.add('selected');
+    } else {
+      commentTextArea.value = '';
+      // По умолчанию красный цвет
+      document.querySelectorAll('.color-circle').forEach(circle => {
+        circle.classList.remove('selected');
+      });
+      document.querySelector('.color-circle[data-color="red"]').classList.add('selected');
+    }
+
+    commentBox.classList.remove('hidden');
+    commentTextArea.focus();
+  }
+
+  function closeComment() {
+    commentBox.classList.add('hidden');
+  }
+
+  function saveComment() {
+    const rowIndex = parseInt(commentBox.dataset.rowIndex, 10);
+    const colIndex = parseInt(commentBox.dataset.colIndex, 10);
+    const text = commentTextArea.value || '';
+
+    // Получаем выбранный цвет
+    const selectedColorCircle = document.querySelector('.color-circle.selected');
+    const color = selectedColorCircle ? selectedColorCircle.dataset.color : 'red';
+
+    setComment(rowIndex, colIndex, text, color);
+
+    const rows = tableBody.rows;
+    if (rowIndex >= 1 && rowIndex <= rows.length) {
+      const row = rows[rowIndex - 1];
+      const cell = row.cells[colIndex];
+
+      const baseValue = cell.textContent || '';
+      const baseTitle = cell.getAttribute('data-full') || cell.title || baseValue;
+
+      if (text) {
+        // Удаляем предыдущие классы
+        cell.classList.remove('commented-cell', 'commented-cell-green');
+        row.classList.remove('commented', 'commented-green');
+
+        // Применяем стиль в зависимости от цвета
+        if (color === 'green') {
+          cell.classList.add('commented-cell-green');
+          row.classList.add('commented-green');
+        } else {
+          cell.classList.add('commented-cell');
+          row.classList.add('commented');
+        }
+
+        cell.title = baseTitle + "\n\nКомментарий: " + text;
+      } else {
+        cell.classList.remove('commented-cell', 'commented-cell-green');
+        row.classList.remove('commented', 'commented-green');
+
+        const rowComments = comments[rowIndex] || {};
+        const hasAny = Object.keys(rowComments).some(function (k) {
+          const comment = rowComments[k];
+          return comment && comment.text && comment.text.length > 0;
+        });
+        if (hasAny) {
+          // Если в строке есть другие комментарии, определяем цвет по первому найденному
+          for (let k in rowComments) {
+            const comment = rowComments[k];
+            if (comment && comment.text && comment.text.length > 0) {
+              if (comment.color === 'green') {
+                row.classList.add('commented-green');
+              } else {
+                row.classList.add('commented');
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    closeComment();
+  }
+
+  // Добавляем обработчики для выбора цвета
+  document.querySelectorAll('.color-circle').forEach(circle => {
+    circle.addEventListener('click', function() {
+      document.querySelectorAll('.color-circle').forEach(c => {
+        c.classList.remove('selected');
+      });
+      this.classList.add('selected');
+    });
+  });
+
   // Функция для добавления лога в группу
   function addToLogGroup(columns) {
     pendingLogs.push(columns);
@@ -397,69 +561,6 @@
       const container = document.getElementById('logContainer');
       container.scrollTop = container.scrollHeight;
     }, 1000); // 1 секунда ожидания перед добавлением группы
-  }
-
-  function getComment(rowIndex, colIndex) {
-    const rowComments = comments[rowIndex];
-    if (!rowComments) return '';
-    return rowComments[colIndex] || '';
-  }
-
-  function setComment(rowIndex, colIndex, text) {
-    if (!comments[rowIndex]) {
-      comments[rowIndex] = {};
-    }
-    comments[rowIndex][colIndex] = text;
-  }
-
-  function openComment(rowIndex, colIndex, cell) {
-    commentRowIndexSpan.textContent = rowIndex;
-    commentColIndexSpan.textContent = colIndex;
-    commentBox.dataset.rowIndex = rowIndex;
-    commentBox.dataset.colIndex = colIndex;
-
-    commentTextArea.value = getComment(rowIndex, colIndex) || '';
-    commentBox.classList.remove('hidden');
-    commentTextArea.focus();
-  }
-
-  function closeComment() {
-    commentBox.classList.add('hidden');
-  }
-
-  function saveComment() {
-    const rowIndex = parseInt(commentBox.dataset.rowIndex, 10);
-    const colIndex = parseInt(commentBox.dataset.colIndex, 10);
-    const text = commentTextArea.value || '';
-
-    setComment(rowIndex, colIndex, text);
-
-    const rows = tableBody.rows;
-    if (rowIndex >= 1 && rowIndex <= rows.length) {
-      const row = rows[rowIndex - 1];
-      const cell = row.cells[colIndex];
-
-      const baseValue = cell.textContent || '';
-      const baseTitle = cell.getAttribute('data-full') || cell.title || baseValue;
-
-      if (text) {
-        cell.classList.add('commented-cell');
-        cell.title = baseTitle + "\n\nКомментарий: " + text;
-        row.classList.add('commented');
-      } else {
-        cell.classList.remove('commented-cell');
-        cell.title = baseTitle;
-        const rowComments = comments[rowIndex] || {};
-        const hasAny = Object.keys(rowComments).some(function (k) {
-          return rowComments[k] && rowComments[k].length > 0;
-        });
-        if (!hasAny) {
-          row.classList.remove('commented');
-        }
-      }
-    }
-
-    closeComment();
   }
 
   async function loadInitial() {
